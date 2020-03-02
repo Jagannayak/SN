@@ -6,7 +6,7 @@ from django.shortcuts import render
 from SerialNumberGenerator.models import *
 
 # Create your views here.
-#
+#testing
 #**********************************Login******************************************#
 class Login(View):
     def get(self,request):

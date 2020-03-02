@@ -1,0 +1,9 @@
+from .settings import db
+from bson.json_util import dumps, loads
+
+# Verify the Profile name existance.
+def profileNameCheck(profileName, userId, result={}):
+    profileName = loads(dumps(db.profiles.find_one({'profileName': profileName, 'userId': userId}, {'_id': 0})))
+    result.update({'message': 'Profile-Name Already Exists.'})
+    if profileName is None: result.update({'message': 'pass'})
+    return result

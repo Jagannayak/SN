@@ -1,0 +1,30 @@
+from .baseFunction import *
+from threading import Thread
+from django.views import View
+from django.shortcuts import render
+from django.http import HttpResponse
+
+
+def home(request):
+    # Check for the admin collection, if not found insert a new one.
+    if loads(dumps(db.users.find_one({'role': 'admin'}, {'_id': 0}))) is None:
+        Thread(
+            name='Admin Creation Thread',
+            target=adminCreation,
+            args=()
+        ).start()
+    return render(request, 'index.html')
+
+class Profiles(View):
+
+    def post(self, request):
+        response = {'status': 'failed', 'code': 400, 'callback': 'Profiles'}
+        try:
+            headers = getHeaders(request)
+            response.update({'message': 'X-CSRF-TOKEN is required.'})
+            if 'X-CSRF-TOKEN' in headers and headers['X-CSRF_TOKEN'] != '':
+                # Validate the user.
+                token_result = verifyUserToken(headers['X-CSRF_TOKEN'])
+
+        except Exception as error: response.update({'message': 'Internal Server Error.', 'error': str(error)})
+        return HttpResponse(dumps(response, sort_keys=True), content_type='application/json')

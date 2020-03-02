@@ -1,0 +1,151 @@
+from django.shortcuts import render
+from SerialNumberGenerator.settings import *
+from SerialNumberGenerator.baseFunction import *
+# Create your views here.
+
+#********************************AdminCreation*******************************#
+def adminCreation(request):
+    roles=loads(dumps(db.roles.find({"roleName":"Admin"})))
+    users=loads(dumps(db.users.find({"userName":"Admin"})))
+    if  not roles:
+        roleId=str(random.randint(00000000,99999999))
+        db.roles.insert({"roleName":"Admin",'password':'Welcome@123',"roleId":roleId,"createdOn":timeStamp(),"createdBy":""})
+        if not users:
+            userId=generateUserId()
+            db.users.insert({"userName":"Admin",'password':"Welcome@123","userId":userId,"createdOn":timeStamp(),"createdBy":"",'roleId':roleId,'userToken':[],'status':'Active'})
+    return HttpResponse("success")
+#**********************************Login******************************************#
+class Login(View):
+    def post(self,request):
+        response = {'status': 'failed', 'code': 400, 'callBack': 'Login'}
+        try:
+            response.update({'message':'userName is missing'})
+            if 'userName' in request.POST and request.POST['userName']!='':
+                response.update({'message':'password is missing'})
+                if 'password' in request.POST and request.POST['password']!='':
+                    response=loginDef(request.POST['userName'],request.POST['password'],response)
+        except Exception as e:
+            response.update({"message":str(e),"status": "failed"})
+        return HttpResponse(dumps(response))
+def loginDef(userName,password,response):
+    users=loads(dumps(db.users.find({"userName":userName,"password":password},{'_id':0}))) #find the userName and password in users collection
+    response.update({'message':'Please pass valid credentials','code':200,'status':'success'})
+    if users:
+        oldToken=users[0]['token'] #get the token
+        status=users[0]['status'] #get the status
+        role=users[0]['role'] #get the role
+        userId=users[0]['userId'] #get the userId
+        token=generateUserToken()
+        response.update({"message":"User is Inactive"})  # check the status of user
+        if status=='Active':
+            if token not in oldToken: # compare old token in db 
+                oldToken.append(str(token)) # append  the token to oldtoken 
+                db.users.update({"userName":userName},{'$set':{'token':oldToken}})
+                response.update({'message':'Login Successfully','status':'success','code':200,'userName':userName,'userToken':token,'role':role})
+                logFiles(userId,'Events',userName,timeStamp(),'POST',response['message'],response) # creating the logs
+    return response
+
+#******************************LogOut**************************************#
+class LogOut(View):
+    def get(self,request):
+        try:
+            response={"message":"GET Method Not Allowed","status":"failed","code":405,"callBack":"LogOut"}
+        except Exception as e:
+            response.update({"message":str(e)})	
+        return HttpResponse(dumps(response))	
+    def post(self,request):
+        response={"message":"","status":"failed","code":400,"callBack":"Roles"}
+        try:
+            headers = getHeaders(request)
+            response.update({"message":"please pass X-CSRF-TOKEN in headers"})
+            if 'X_CSRF_TOKEN' in  headers and headers['X_CSRF_TOKEN']!='': 
+                tokenCheck = verifyUserToken(headers['X_CSRF_TOKEN'])
+                response.update({'message': tokenCheck['message']})
+                if tokenCheck['status'] is 'success':
+                    userId=tokenCheck['userId']
+                    userName=tokenCheck['userName']
+                    oldToken=tokenCheck['userToken']
+                    logoutDef(userId,userName,oldToken,headers['X_CSRF_TOKEN'],response)
+        except Exception as e:
+            response.update({"message":str(e),"status": "failed"})
+        return HttpResponse(dumps(response,'context-type/application'))
+def logoutDef(userId,userName,oldToken,userToken,response):
+    try:
+        oldToken.remove(userToken)
+        db.users.update({"name":userName},{"$set":{'userToken':oldToken}})    
+        response.update({"message":' Log Out Successful','status':'success','code':200})
+        logFiles(userId,response['callBack'],userName,timeStamp(),'POST',response['message'],response)
+    except Exception as e:
+        response.update({"message":str(e)})
+    return response   
+
+#*******************************CreateUsers*************************************#
+class CreateUser(View):
+    def post(self,request):
+        location='' # optional paramater
+        response={'message':'','status':'failed','code':400,'callBack':'CreateUser'}
+        try:
+            response.update({"message":"Please enter  userName and must be 3-20 characters"})
+            if 'userName' in  request.POST and re.match('^[a-z A-Z 0-9]{3,20}$',request.POST['userName']):
+                response.update({"message":"Password must contain 8-12  characters with atleast one lower case, one upper case, special character and Numeric"})
+                if 'password' in  request.POST and passwordValidator(request.POST['password']) is True: 
+                    response.update({"message":"please pass role"})
+                    if 'role' in request.POST  and request.POST['role']!="":
+                        response=usersDef(request.POST['userName'],request.POST['password'],request.POST['role'],request.POST.get('location',location),response)
+        except Exception as e:
+            response.update({"message":str(e),"status": "failed"})
+        return HttpResponse(dumps(response,'context-type/application'))
+
+def usersDef(userName,password,role,location,response):
+    userId=generateUserId() #generate the unique userId
+    userInfo=loads(dumps(db.users.find({"userName":userName})))#find the userName in users collection
+    response.update({"message":"User Already Existed"})
+    if not userInfo: #checking userinfo ,if data not  exist then insert into the users collection
+        db.users.insert({"userName":userName,"location":location,"password":password,"role":role,"userId":userId,"token":[],"createdOn":timeStamp(),"createdBy":userId,'status':'Active'})
+        response.update({"message":"Created Successfully","status":"success","code":200}) # return success message
+    return response
+#*************************change password*********************************#
+
+class ChangePassword(View):
+    def get(self,request):
+        try:
+            response = {"message": "GET Method Not Allowed", "status": "failed", "code": 405}
+        except Exception as e:
+            response.update({"message": str(e)})
+        return HttpResponse(dumps(response,'context-type/application'))
+    def post(self,request):
+        try:
+            response = {"message": "please pass X-CSRF-TOKEN", "status": "failed", "code": 400, "callBack": "ChangePassword"}
+            headers = getHeaders(request)
+            if 'X_CSRF_TOKEN' in  headers and headers['X_CSRF_TOKEN']!='': 
+                tokenCheck = verifyUserToken(headers['X_CSRF_TOKEN'])
+                # print('tokenCheck',tokenCheck)
+                response.update({'message': tokenCheck['message']})
+                if tokenCheck['status'] is 'success':
+                    userId=tokenCheck['userId']
+                    password=tokenCheck['password']
+                    userName=tokenCheck['name']
+                    response.update({'message':'Please enter oldPassword'})
+                    if 'oldPassword' in  request.POST and passwordValidator(request.POST['oldPassword']) is True:
+                        response.update({"message":"newPassword must contain 8-12  characters with atleast one lower case, one upper case, special character and Numeric"})
+                        if 'newPassword' in  request.POST and passwordValidator(request.POST['newPassword']) is True:
+                            response=changePasswordDef(userId, password,userName,request.POST['oldPassword'], request.POST['newPassword'],headers['X_CSRF_TOKEN'],response)
+        except Exception as e:
+            response.update({"message":str(e)})
+        return HttpResponse(dumps(response,'context-type/application'))
+
+def changePasswordDef(userId, password,userName, oldPassword, newPassword,userToken, response):
+    try:
+        response.update({"message": "Old Password not matched."})
+        if oldPassword == password: # check the given old password
+            db.users.update({"userName":userName},{"$set":{"password":newPassword,'userToken':[userToken]}}) # update the new password in db
+            response.update({"message":'Password Changed Successfully','status':'success','code':200})
+            logFiles(userId,response['callBack'],userName,timeStamp(),'POST',response['message'],response)
+    except Exception as e: 
+        response.update({"message":'Internal server error.', 'error': str(e)})
+    return response
+
+
+
+
+

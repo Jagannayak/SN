@@ -1,0 +1,70 @@
+from django.shortcuts import render
+import random 
+import string 
+from SerialNumberGenerator.baseFunction import *
+
+
+
+class CreditManagement(View):
+    
+    def post(self,request):
+        response={"message":"","status":"failed","code":200,"callBack":"CreditManaagement"}
+        try:
+            headers = getHeaders(request)
+            response.update({"message":"X-CSRF-TOKEN is missing in headers"})
+            if 'X_CSRF_TOKEN' in  headers and headers['X_CSRF_TOKEN']!='':
+                response.update({"message":"points are missing"})
+                if "points" in request.POST and request.POST['points']!="":
+                    response.update({"message":"remarks is missing"})
+                    if "remarks" in request.POST and request.POST['remarks']!='':
+                        response=self.createCreditManagementDef(headers['X-CSRF-TOKEN'],request.POST['points'],request.POST['remarks'],response)
+        except Exception as e:
+            response.update({"message":str(e),"status": "failed"})
+        return HttpResponse(dumps(response))
+
+    def createCreditManagementDef(self, userToken,points,remarks,response):
+        usersCheck=verifyUserToken(userToken)
+        # usersCheck=loads(dumps(DATABASE.users.find({"userToken":userToken},{'_id':0,'role':1,'userId':1}))) # check the users
+        response.update({"message":'Invalid User'})
+        if usersCheck:
+            userId=usersCheck['userId']
+            status=usersCheck['status']
+            roleName=usersCheck['roleName']
+            response.update({"message":"valid user"})
+            if status=="active":
+                userData = loads(dumps(db.users.find({"userId":userId,"status":"active"}, {'_id':0,'role':1,"userId":1,"userName":1,"email":1,"phoneNumber":1})))
+                response.update({"message":"getting user successfully","userData":userData,"code":200,"status":"success"})
+
+
+        return response
+
+#**********************************************************************
+ 
+
+class LoadCredit(View):
+    def post(self,request):
+        response={"message":"","status":"failed","code":200,"callBack":"LoadCredit"}
+        try:
+            headers = getHeaders(request)
+            response.update({"message":"X-CSRF-TOKEN is missing in headers"})
+            if 'X_CSRF_TOKEN' in  headers and headers['X_CSRF_TOKEN']!='':
+                usersCheck=verifyUserToken(['X_CSRF_TOKEN'])
+                roleName=usersCheck['role']
+                userId=usersCheck['userId']
+                if roleName=="user":
+                    response.update({"message":"Enter points"})
+                    if "points" in request.POST and request.POST['points']!="":
+                        response=self.loadCreditDef(userId,request.POST['points'],response)
+               
+
+
+
+                
+        except Exception as e:
+            response.update({"message":str(e),"status":"failed"})
+        return HttpResponse(dumps(response),content_type="application/json")
+
+    def loadCreditDef(self,userId,points,response):
+        db.creditRequest.insert({"requestID":requestId(),"pointesRequested":points,"userId":userId,"paymentMode":"credit","paymentModeOn":timeStamp(),"isPaymentDone":"No"})
+        response.update({"message":"requested sent successfully","status":"success","code":200})
+        return response

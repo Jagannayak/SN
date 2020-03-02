@@ -1,0 +1,15 @@
+from django.views import View
+from django.shortcuts import render
+from django.http import HttpResponse
+from SerialNumberGenerator.baseFunction import *
+
+def home(request):
+    return render(request, 'index.html',)
+#********************************AdminCreation*******************************#
+def adminCreation(request):
+    users=loads(dumps(db.roles.find({"role":"admin"})))
+    if  not users:
+        userId=generateUserId()
+        db.users.insert({"role":"admin",'password':'Welcome@123',"createdOn":timeStamp(),"createdBy":"",'email':'Accelsap@gmail.com','phoneNumber':'9999999999','userToken':[],'status':'active','userName':'user1',"userId":userId})
+    return HttpResponse("success")
+    

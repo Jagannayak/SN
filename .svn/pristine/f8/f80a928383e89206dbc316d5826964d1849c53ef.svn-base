@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+    <meta charset="ISO-8859-1">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <head>
+        <link rel="shortcut icon" href="static/assets/logo.ico" type="image/x-icon" size="32x32">
+        <title>SNG</title>
+    <style>
+        body { 
+                background-image: url('static/assets/2.jpg');
+                background-repeat: no-repeat;
+                background-attachment: fixed;
+                background-position: center; 
+                background-size: 500px 500px; 
+            }
+        h3{
+            font-family: Lucida Bright;
+            text-align: center;
+        }
+    </style>
+    </head>
+    <body>
+    <h3> RANDOM SERIAL NUMBER GENERATOR </h3>
+    </body>
+</html>

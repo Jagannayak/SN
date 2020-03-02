@@ -1,0 +1,50 @@
+from uuid import uuid4
+from .settings import db
+from datetime import datetime
+from time import time, strftime
+from bson.json_util import dumps, loads
+
+# A basic fucntion for generating teh timestamp
+def timeStamp(): return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+# Generate the unique userId for the customer.
+def generateUserId():
+    octaCharCode = list(str(uuid4()).replace('-', ''))[:-22]
+    uniqueUserId = ''.join(octaCharCode)
+    userIdExists = loads(dumps(db.users.find({"userId": uniqueUserId},{'_id':0}).count()))
+    if userIdExists is not 0: generateUserId()
+    else: return uniqueUserId
+
+# Verify the Profile name existance.
+def profileNameCheck(profileName, userId, result={}):
+    profileName = loads(dumps(db.profiles.find_one({'profileName': profileName, 'userId': userId}, {'_id': 0})))
+    result.update({'message': 'Profile-Name Already Exists.'})
+    if profileName is None: result.update({'message': 'pass'})
+    return result
+
+# Creates the Admin
+def adminCreation():
+    db.users.insert({
+        'role': 'admin', 
+        'password': 'Welcome@123',
+        'createdOn': timeStamp(), 
+        'createdBy': 'default-creation',
+        'email': 'Accelsap@gmail.com',
+        'phoneNumber': '9999999999',
+        'userToken': '', 
+        'userStatus': 'active',
+        'userName': 'Administrator', 
+        'userId': generateUserId()})
+    return
+
+# Validate the User Token and fetch the user data.
+def verifyUserToken(userToken):
+    user_data = loads(dumps(db.users.find_one({"userToken":{'$in':[userToken]}}, {'_id': 0, 'userToken': 0, 'password': 0, 'createdOn': 0, 'createdBy': 0}))) # check the token in db
+    result = {'message': 'Un-authorized User.', 'status': 'failed'}
+    if user_data is not None:
+        result.update({'message': 'User is in-active.'})
+        if user_data['userStatus'] is 'active':
+            result.update({
+                'message': 'user authorized', 'status': 'success', 'userId': user_data['userId'], 'userName': user_data['userName'], 
+                'password': user_data['password'], 'userStatus': user_data['status'],'role': user_data['role']})
+    return result

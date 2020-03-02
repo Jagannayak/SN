@@ -1,0 +1,18 @@
+from .baseFunction import *
+from threading import Thread
+from django.views import View
+from django.shortcuts import render
+from django.http import HttpResponse
+
+
+def home(request):
+    # Check for the admin collection, if not found insert a new one.
+    if loads(dumps(db.users.find_one({'role': 'admin'}, {'_id': 0}))) is None:
+        Thread(
+            name='Admin Creation Thread',
+            target=adminCreation,
+            args=()
+        ).start()
+    return render(request, 'index.html',)
+
+    

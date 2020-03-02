@@ -1,0 +1,113 @@
+from django.shortcuts import render
+from SerialNumberGenerator.settings import *
+from SerialNumberGenerator.baseFunction import *
+# Create your views here.
+#**********************************Login******************************************#
+class Login(View):
+    def get(self,request):
+        try:
+            response={"message":"GET Method Not Allowed","status":"failed","code":405,"callBack":"Login"}
+        except Exception as e:
+            response.update({"message":str(e)})	
+        return HttpResponse(dumps(response))	
+    def post(self,request):
+        response={"message":"","status":"failed","code":400,"callBack":"Login"}
+        try:
+            response.update({"message":"Please enter name"})
+            if 'name' in request.POST and  request.POST['name']!='':
+                response.update({"message":"Please enter password"})
+                if 'password' in request.POST and request.POST['password']!='':
+                    response= loginDef(request.POST['name'],request.POST['password'],response)
+        except Exception as e:
+            response.update({"message":str(e),"status": "failed"})
+        return HttpResponse(dumps(response),content_type="application/json")
+def loginDef(userName,password,response) :
+    try:
+        userToken=generateUserToken() # generating the user token
+        usersCheck=loads(dumps(db.users.find({"userName":userName,'password':password},{"_id":0,'status':1,'userId':1,'userToken':userToken}))) # check the users in db
+        print(usersCheck)
+        response.update({"message":'Invalid Login Credentials'}) # return the message if user not available
+        if usersCheck:# checking the users
+            status=usersCheck[0]['status']
+            oldToken=usersCheck[0]['userToken']
+            userId=usersCheck[0]['userId']
+            response.update({"message":"User is Inactive"})  # check the status of user
+            if status == 'active': # if active allow to login
+                if passwordValidator(password) is True: # checkt the given password validation
+                    if userToken not in oldToken: # compare old token in db 
+                        oldToken.append(str(userToken))
+                        db.users.update({"userName":userName},{'$set':{'userToken':oldToken}}) # generate token when login
+                        response.update({"message":'Login Successful','status':'success','code':200,'userName':userName,'userToken':userToken})
+                        # logFiles(userId,response['callBack'],userName,timeStamp(),'POST',response['message'],response)
+    except Exception as e:
+        response.update({"message":str(e)})
+    return response       
+
+#******************************LogOut**************************************#
+class LogOut(View):
+    def get(self,request):
+        try:
+            response={"message":"GET Method Not Allowed","status":"failed","code":405,"callBack":"LogOut"}
+        except Exception as e:
+            response.update({"message":str(e)})	
+        return HttpResponse(dumps(response))	
+    def post(self,request):
+        response={"message":"","status":"failed","code":400,"callBack":"Roles"}
+        try:
+            headers = getHeaders(request)
+            response.update({"message":"please pass X-CSRF-TOKEN in headers"})
+            if 'X_CSRF_TOKEN' in  headers and headers['X_CSRF_TOKEN']!='': 
+                tokenCheck = verifyUserToken(headers['X_CSRF_TOKEN'])
+                print("********************************",tokenCheck)
+                response.update({'message': tokenCheck['message']})
+                if tokenCheck['status'] is 'success':
+                    userId=tokenCheck['userId']
+                    userName=tokenCheck['userName']
+                    oldToken=tokenCheck['userToken']
+                    logoutDef(userId,userName,oldToken,headers['X_CSRF_TOKEN'],response)
+        except Exception as e:
+            response.update({"message":str(e),"status": "failed"})
+        return HttpResponse(dumps(response))
+def logoutDef(userId,userName,oldToken,userToken,response):
+    try:
+        oldToken.remove(userToken)
+        db.users.update({"userName":userName},{"$set":{'userToken':oldToken}})    
+        response.update({"message":' Log Out Successful','status':'success','code':200})
+        # logFiles(userId,response['callBack'],userName,timeStamp(),'POST',response['message'],response)
+    except Exception as e:
+        response.update({"message":str(e)})
+    return response   
+#*******************************CreateUsers*************************************#
+class CreateUser(View):
+    def get(self,request):
+
+        response={"message":"GET Method Not Allowed","status":"failed","code":405,"callBack":"UserCreation"}	
+        return HttpResponse(dumps(response))
+    def post(self,request):
+        response={"message":"","status":"failed","code":400,"callBack":"UserCreation"}
+        try:
+            headers = getHeaders(request)
+            response.update({"message":"please pass X-CSRF-TOKEN in headers"})
+            if 'X_CSRF_TOKEN' in  headers and headers['X_CSRF_TOKEN']!='': 
+                response.update({"message":"userName is missing and must be 3-20 characters"})
+                if 'userName' in  request.POST and re.match('^[a-z A-Z 0-9]{3,20}$',request.POST['userName']):
+                    response.update({"message":"mailId is missing"})
+                    if 'mailId' in  request.POST and request.POST['mailId']!='':
+                        response.update({"message":"password must contain 8-12  characters with atleast one lower case, one upper case, special character and numeric"})
+                        if 'password' in  request.POST and passwordValidator(request.POST['password']) is True:
+                            response.update({"message":"contactNumber must be 10-14 digits"})
+                            if 'contactNumber' in request.POST and re.match('^[0-9]{10,14}$',request.POST['contactNumber']):
+                                response=usersDef(request.POST['userName'],request.POST['mailId'],request.POST['password'],request.POST['contactNumber'],response)
+        except Exception as e:
+            response.update({"message":str(e),"status": "failed"})
+        return HttpResponse(dumps(response,'context-type/application'))
+
+def usersDef(userName,mailId,password,contactNumber,response):
+    userId=generateUserId() #generate the unique userId
+    userInfo=loads(dumps(db.users.find({"userName":userName})))#find the userName in users collection
+    response.update({"message":"User Already Existed"})
+    if not userInfo: #checking userinfo ,if data not  exist then insert into the users collection
+        db.users.insert({"userName":userName,"password":password,"role":'user',"userId":userId,"token":[],"createdOn":timeStamp(),"createdBy":userId,'status':'active','phoneNumber':contactNumber,'email':mailId,})
+        response.update({"message":"Created Successfully","status":"success","code":200}) # return success message
+    return response
+#*************************change password*********************************#

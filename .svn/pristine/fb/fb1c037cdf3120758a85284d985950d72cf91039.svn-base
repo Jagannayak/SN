@@ -1,0 +1,37 @@
+from uuid import uuid4
+from .settings import db
+from datetime import datetime
+from time import time, strftime
+from bson.json_util import dumps, loads
+
+# A basic fucntion for generating teh timestamp
+def timeStamp(): return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+# Generate the unique userId for the customer.
+def generateUserId():
+    octaCharCode = list(str(uuid4()).replace('-', ''))[:-22]
+    uniqueUserId = ''.join(octaCharCode)
+    userIdExists = loads(dumps(db.users.find({"userId": uniqueUserId},{'_id':0}).count()))
+    if userIdExists is not 0: generateUserId()
+    else: return uniqueUserId
+
+# Verify the Profile name existance.
+def profileNameCheck(profileName, userId, result={}):
+    profileName = loads(dumps(db.profiles.find_one({'profileName': profileName, 'userId': userId}, {'_id': 0})))
+    result.update({'message': 'Profile-Name Already Exists.'})
+    if profileName is None: result.update({'message': 'pass'})
+    return result
+
+# Creates the Admin
+def adminCreation():
+    db.users.insert({
+        'role': 'admin', 
+        'password':'Welcome@123',
+        "createdOn": timeStamp(), 'createdBy': 'default-creation',
+        'email':'Accelsap@gmail.com',
+        'phoneNumber':'9999999999',
+        'userToken':[], 
+        'status':'active',
+        'userName':'Administrator', 
+        'userId': generateUserId()})
+    return

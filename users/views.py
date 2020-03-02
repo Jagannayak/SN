@@ -63,26 +63,7 @@ class LogOut(View):
             headers = getHeaders(request)
             response.update({"message":"please pass X-CSRF-TOKEN in headers"})
             if 'X_CSRF_TOKEN' in  headers and headers['X_CSRF_TOKEN']!='': 
-<<<<<<< .mine
-                tokenCheck = verifyUserToken(headers['X_CSRF_TOKEN'])
-                response.update({'message': tokenCheck['message']})
-                if tokenCheck['status'] is 'success':
-                    userId=tokenCheck['userId']
-                    userName=tokenCheck['userName']
-                    oldToken=tokenCheck['userToken']
-                    logoutDef(userId,userName,oldToken,headers['X_CSRF_TOKEN'],response)
-||||||| .r1678
-                tokenCheck = verifyUserToken(headers['X_CSRF_TOKEN'])
-                print("********************************",tokenCheck)
-                response.update({'message': tokenCheck['message']})
-                if tokenCheck['status'] is 'success':
-                    userId=tokenCheck['userId']
-                    userName=tokenCheck['userName']
-                    oldToken=tokenCheck['userToken']
-                    logoutDef(userId,userName,oldToken,headers['X_CSRF_TOKEN'],response)
-=======
                 response= logoutDef(headers['X_CSRF_TOKEN'],response)
->>>>>>> .r1707
         except Exception as e:
             response.update({"message":str(e),"status": "failed"})
         return HttpResponse(dumps(response),content_type="application/json")
